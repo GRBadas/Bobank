@@ -80,8 +80,10 @@
       _unsubscribe = onSnapshot(ref, snap => {
         if(snap.exists()) {
           isSyncing = true;
+          isRendering = true; // 🔴 ADICIONA ISSO
 
           const saved = JSON.parse(snap.data().state);
+
           Object.keys(saved).forEach(k => {
             if(k in S) S[k] = saved[k];
           });
@@ -90,6 +92,7 @@
 
           setTimeout(() => {
             isSyncing = false;
+            isRendering = false; // 🔴 ADICIONA ISSO
           }, 400);
         }
       });
@@ -1090,19 +1093,20 @@ let S={
 
 // ── PERSISTENCE (Firebase only — localStorage fallback when offline) ──
 const STORAGE_KEY='financer_v5_state';
+let isRendering = false;
+
 function saveState(){
-  if (isSyncing) return; // 🔴 ESSA LINHA É A CHAVE
+  if (isSyncing || isRendering) return; // 🔴 ESSENCIAL
 
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(S));
   }catch(e){}
 
-  if(window._firebaseUid){
-    if(window.saveToFirestore){
-      window.saveToFirestore(window._firebaseUid, S);
-    }
+  if(window._firebaseUid && window.saveToFirestore){
+    window.saveToFirestore(window._firebaseUid, S);
   }
 }
+
 function migrateState(){
   S.fixos.forEach(f=>{if(f.venc!==undefined&&f.vencDia===undefined){const m=String(f.venc).match(/\d+/);f.vencDia=m?parseInt(m[0]):null;delete f.venc;}});
   if(!S.fixosExecucoes)S.fixosExecucoes=[];
