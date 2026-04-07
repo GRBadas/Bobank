@@ -8,10 +8,6 @@
 
   <!-- ═══ FIREBASE SDK ═══ -->
   <script type="module">
-    // ╔══════════════════════════════════════════════════════════╗
-    // ║  CONFIGURAÇÃO FIREBASE — substitua pelos seus dados      ║
-    // ║  Console: https://console.firebase.google.com            ║
-    // ╚══════════════════════════════════════════════════════════╝
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
       from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -26,13 +22,15 @@
       messagingSenderId: "678449673428",
       appId: "1:678449673428:web:8dea1ec2325b45cad5f741"
     };
-    let isSyncing = false;
-    const app  = initializeApp(firebaseConfig);
+
+    const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db   = getFirestore(app);
+    const db = getFirestore(app);
     const provider = new GoogleAuthProvider();
 
     let _unsubscribe = null;
+    let isSyncing = false;
+    let saveTimeout = null;
 
     // ── Login ──
     window.loginGoogle = async () => {
@@ -51,50 +49,85 @@
       await signOut(auth);
     };
 
-    // ── Save to Firestore ──
+    // ── Save to Firestore (CORRIGIDO) ──
     window.saveToFirestore = async (uid, state) => {
-      console.log("SAVE BLOQUEADO TEMP"); 
-      return; // 🔴 corta totalmente
+      if (!uid || isSyncing) return;
+      
+      // Debounce saves para evitar muitas escritas
+      if (saveTimeout) clearTimeout(saveTimeout);
+      
+      saveTimeout = setTimeout(async () => {
+        try {
+          const ref = doc(db, "users", uid);
+          await setDoc(ref, {
+            state: JSON.stringify(state),
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+          console.log("✅ Dados salvos no Firebase");
+        } catch(e) {
+          console.error("Erro ao salvar:", e);
+        }
+        saveTimeout = null;
+      }, 300);
     };
 
     // ── Auth state watcher ──
     onAuthStateChanged(auth, async user => {
       if(user) {
-        // logged in
+        console.log("Usuário logado:", user.email);
+        
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app').style.display = 'grid';
         document.getElementById('user-name').textContent = user.displayName || user.email;
         document.getElementById('user-avatar').src = user.photoURL || '';
         document.getElementById('user-avatar').style.display = user.photoURL ? 'block' : 'none';
 
-        // listen for real-time changes
         if(_unsubscribe) _unsubscribe();
+        
         const ref = doc(db, "users", user.uid);
-        _unsubscribe = onSnapshot(ref, snap => {
-          if(snap.exists()) {
-            isSyncing = true;
-            isRendering = true; // 🔴 ADICIONA ISSO
-
+        
+        // Primeiro, tenta carregar dados existentes
+        const snap = await getDoc(ref);
+        if(snap.exists()) {
+          isSyncing = true;
+          try {
             const saved = JSON.parse(snap.data().state);
-
-            Object.keys(saved).forEach(k => {
-              if(k in S) S[k] = saved[k];
-            });
-
-            renderAll();
-
-            setTimeout(() => {
-              isSyncing = false;
-              isRendering = false; // 🔴 ADICIONA ISSO
-            }, 400);
+            if (typeof window.loadFromFirebase === 'function') {
+              window.loadFromFirebase(saved);
+            }
+          } catch(e) {
+            console.error("Erro ao carregar dados:", e);
+          }
+          isSyncing = false;
+        }
+        
+        // Depois, escuta mudanças em tempo real
+        _unsubscribe = onSnapshot(ref, (snap) => {
+          if(snap.exists() && !isSyncing) {
+            isSyncing = true;
+            try {
+              const saved = JSON.parse(snap.data().state);
+              if (typeof window.loadFromFirebase === 'function') {
+                window.loadFromFirebase(saved);
+              }
+            } catch(e) {
+              console.error("Erro no snapshot:", e);
+            }
+            setTimeout(() => { isSyncing = false; }, 500);
           }
         });
+        
         window._firebaseUid = user.uid;
+        
       } else {
-        // logged out
+        console.log("Usuário deslogado");
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app').style.display = 'none';
         window._firebaseUid = null;
+        if(_unsubscribe) {
+          _unsubscribe();
+          _unsubscribe = null;
+        }
       }
     });
   </script>
@@ -1139,7 +1172,13 @@
   function save(){
     saveState();
     showSaveToast('☁️ Salvo');
-    scheduleRender(); // renderiza uma vez só
+    
+    // Salva no Firebase se estiver logado
+    if(window._firebaseUid && window.saveToFirestore && !isExternalUpdate && !isSyncing) {
+      window.saveToFirestore(window._firebaseUid, S);
+    }
+    
+    scheduleRender();
   }
 
   // ── UTILS ──
@@ -1638,6 +1677,45 @@
     renderPendencias();
     renderInvestimentos();
   }
+
+  // ── CARREGAR DADOS DO FIREBASE ──
+window.loadFromFirebase = function(savedState) {
+  if (!savedState) return;
+  
+  // Evita loop de renderização
+  isExternalUpdate = true;
+  
+  // Mescla os dados salvos com o estado atual
+  Object.keys(savedState).forEach(k => {
+    if (k in S) {
+      S[k] = savedState[k];
+    }
+  });
+  
+  // Recupera configurações
+  if (S.cfg) {
+    if($('cfg-cdi')) $('cfg-cdi').value = S.cfg.cdi ?? 10.75;
+    if($('cfg-pct-caix')) $('cfg-pct-caix').value = S.cfg.pctCaix ?? 115;
+    if($('cfg-pct-mp')) $('cfg-pct-mp').value = S.cfg.pctMp ?? 105;
+    if($('cfg-saldo-mp')) $('cfg-saldo-mp').value = S.cfg.saldoMp ?? 0;
+    if($('cfg-dias')) $('cfg-dias').value = S.cfg.dias ?? 30;
+  }
+  
+  // Re-renderiza tudo
+  renderAll();
+  populateCatSelects();
+  populateCartaoSelects();
+  updateMonthBar();
+  updatePendenciaBadge();
+  updateFixosBadge();
+  
+  // Libera para salvar novamente
+  setTimeout(() => {
+    isExternalUpdate = false;
+  }, 300);
+  
+  console.log("📥 Dados carregados do Firebase");
+};
 
   // ── INIT ──
   loadState();
