@@ -26,7 +26,7 @@
     messagingSenderId: "678449673428",
     appId: "1:678449673428:web:8dea1ec2325b45cad5f741"
   };
-
+  let isSyncing = false;
   const app  = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db   = getFirestore(app);
@@ -53,9 +53,15 @@
 
   // ── Save to Firestore ──
   window.saveToFirestore = async (uid, state) => {
+    if (isSyncing) return; // 🔴 ESSA LINHA RESOLVE
+
     try {
-      await setDoc(doc(db, "users", uid), { state: JSON.stringify(state) }, { merge: true });
-    } catch(e) { console.error("Save error:", e); }
+      await setDoc(doc(db, "users", uid), {
+        state: JSON.stringify(state)
+      }, { merge: true });
+    } catch(e) {
+      console.error("Save error:", e);
+    }
   };
 
   // ── Auth state watcher ──
@@ -73,17 +79,18 @@
       const ref = doc(db, "users", user.uid);
       _unsubscribe = onSnapshot(ref, snap => {
         if(snap.exists()) {
-          try {
-            const saved = JSON.parse(snap.data().state);
-            Object.keys(saved).forEach(k => { if(k in S) S[k] = saved[k]; });
-            migrateState();
-            populateCatSelects();
-            populateCartaoSelects();
-            updateMonthBar();
-            renderAll();
-            updatePendenciaBadge();
-            updateFixosBadge();
-          } catch(e) { console.error("Load error:", e); }
+          isSyncing = true;
+
+          const saved = JSON.parse(snap.data().state);
+          Object.keys(saved).forEach(k => {
+            if(k in S) S[k] = saved[k];
+          });
+
+          renderAll();
+
+          setTimeout(() => {
+            isSyncing = false;
+          }, 100);
         }
       });
       window._firebaseUid = user.uid;
