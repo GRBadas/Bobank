@@ -1467,17 +1467,27 @@ async function addEntrada() {
     obs: document.getElementById("e-obs").value
   };
 
-  // 🔴 FIREBASE (mantém por enquanto)
-  state.entradas.push(entrada);
-  saveToFirestore(window._firebaseUid, state);
-
-  // 🟢 SUPABASE (NOVO)
+  // 🟢 SUPABASE
   const { error } = await supabase.from("entradas").insert([
     {
       user_id: window._firebaseUid,
       ...entrada
     }
   ]);
+
+  if (error) {
+    console.error("Erro Supabase:", error);
+    alert("Erro ao salvar");
+    return;
+  }
+
+  console.log("✅ Salvo no Supabase");
+
+  // 🔄 Atualiza tela manualmente (temporário)
+  if (typeof renderEntradas === "function") {
+    renderEntradas([entrada]); // simplificado
+  }
+}
 
   if (error) {
     console.error("Erro Supabase:", error);
