@@ -6,12 +6,18 @@
 <title>Bobank — Controle Financeiro</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const supabase = window.supabase.createClient(
+    "https://lagpinggqcbvxfuaqbng.supabase.co",
+    "sb_publishable_iow_Xsogpfdy7Fpg_cK_zA_GEBMUE39"
+  );
 
   const firebaseConfig = {
     apiKey: "AIzaSyCsv_bMot_zHFcGJsWKjA5G5ioEUIkOb-U",
@@ -1450,12 +1456,34 @@ function renderCartoes(){
 }
 
 // ── ENTRADAS ──
-function addEntrada(){
-  const data=$('e-data').value,tipo=$('e-tipo').value,catId=parseInt($('e-cat').value)||null,cartaoId=parseInt($('e-cartao').value)||null,desc=($('e-desc').value||'').trim(),val=parseFloat($('e-val').value),obs=$('e-obs').value;
-  if(!desc||isNaN(val)||val<=0)return alert('Preencha descrição e valor.');
-  S.entradas.push({id:uid(),data,mes:S.mesAtivo,tipo,catId,cartaoId,desc,val,obs});
-  $('e-desc').value='';$('e-val').value='';$('e-obs').value='';
-  save();renderEntradas();renderDashboard();renderCartoes();
+async function addEntrada() {
+  const entrada = {
+    data: document.getElementById("e-data").value,
+    tipo: document.getElementById("e-tipo").value,
+    categoria: document.getElementById("e-cat").value,
+    cartao: document.getElementById("e-cartao").value,
+    descricao: document.getElementById("e-desc").value,
+    valor: parseFloat(document.getElementById("e-val").value || 0),
+    obs: document.getElementById("e-obs").value
+  };
+
+  // 🔴 FIREBASE (mantém por enquanto)
+  state.entradas.push(entrada);
+  saveToFirestore(window._firebaseUid, state);
+
+  // 🟢 SUPABASE (NOVO)
+  const { error } = await supabase.from("entradas").insert([
+    {
+      user_id: window._firebaseUid,
+      ...entrada
+    }
+  ]);
+
+  if (error) {
+    console.error("Erro Supabase:", error);
+  } else {
+    console.log("✅ Salvo no Supabase");
+  }
 }
 function delEntrada(id){S.entradas=S.entradas.filter(e=>e.id!=id);save();renderEntradas();renderDashboard();renderCartoes();}
 function renderEntradas(){
