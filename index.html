@@ -90,7 +90,7 @@
 
           setTimeout(() => {
             isSyncing = false;
-          }, 100);
+          }, 400);
         }
       });
       window._firebaseUid = user.uid;
@@ -1091,9 +1091,16 @@ let S={
 // ── PERSISTENCE (Firebase only — localStorage fallback when offline) ──
 const STORAGE_KEY='financer_v5_state';
 function saveState(){
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(S));}catch(e){}
+  if (isSyncing) return; // 🔴 ESSA LINHA É A CHAVE
+
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(S));
+  }catch(e){}
+
   if(window._firebaseUid){
-    if(window.saveToFirestore) window.saveToFirestore(window._firebaseUid, S);
+    if(window.saveToFirestore){
+      window.saveToFirestore(window._firebaseUid, S);
+    }
   }
 }
 function migrateState(){
