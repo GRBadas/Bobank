@@ -53,15 +53,8 @@
 
   // ── Save to Firestore ──
   window.saveToFirestore = async (uid, state) => {
-    if (isSyncing) return; // 🔴 ESSA LINHA RESOLVE
-
-    try {
-      await setDoc(doc(db, "users", uid), {
-        state: JSON.stringify(state)
-      }, { merge: true });
-    } catch(e) {
-      console.error("Save error:", e);
-    }
+    console.log("SAVE BLOQUEADO TEMP"); 
+    return; // 🔴 corta totalmente
   };
 
   // ── Auth state watcher ──
