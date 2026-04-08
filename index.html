@@ -1021,9 +1021,19 @@ async function loadFromCloud(userId){
 // ════ AUTH ════
 async function loginGoogle(){
   setLoginLoading(true,'Abrindo autenticação Google...');
+  
+  const redirectTo = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `http://${window.location.host}`
+    : 'https://bobank.vercel.app';
+
   const {error} = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href }
+    options: { 
+      redirectTo,
+      queryParams: {
+        prompt: 'select_account'  // <- força o seletor de conta sempre
+      }
+    }
   });
   if(error){ showLoginError(error.message); setLoginLoading(false); }
 }
@@ -1727,18 +1737,76 @@ function renderAll(){
 }
 
 // ════ INIT ════
-// Mostrar login enquanto aguarda auth
 document.getElementById('login-screen').classList.add('visible');
 toggleCartaoFields();
 
-// tipo entrada listener
-const eTipo=document.getElementById('e-tipo');
-if(eTipo)eTipo.addEventListener('change',handleTipoChange);
+const eTipo = document.getElementById('e-tipo');
+if(eTipo) eTipo.addEventListener('change', handleTipoChange);
 
-// clear btn
-const cw=document.getElementById('clear-btn-wrap');
-if(cw)cw.innerHTML='<button onclick="clearData()" style="background:none;border:1px solid var(--border2);color:var(--text3);border-radius:7px;padding:4px 12px;font-size:.67rem;cursor:pointer;font-family:inherit;font-weight:600">🗑 Limpar dados</button>';
-async function clearData(){if(!confirm('Apagar TODOS os dados da nuvem? Esta ação não pode ser desfeita.'))return;if(!currentUser)return;await sb.from('bobank_data').delete().eq('user_id',currentUser.id);S=DEFAULT_STATE();renderAll();showSync('saved','Dados apagados');}
+const cw = document.getElementById('clear-btn-wrap');
+if(cw) cw.innerHTML = '<button onclick="clearData()" style="background:none;border:1px solid var(--border2);color:var(--text3);border-radius:7px;padding:4px 12px;font-size:.67rem;cursor:pointer;font-family:inherit;font-weight:600">🗑 Limpar dados</button>';
+
+async function clearData(){
+  if(!confirm('Apagar TODOS os dados da nuvem? Esta ação não pode ser desfeita.')) return;
+  if(!currentUser) return;
+  await sb.from('bobank_data').delete().eq('user_id', currentUser.id);
+  S = DEFAULT_STATE(); renderAll(); showSync('saved','Dados apagados');
+}
+
+function showLogin() {
+  document.getElementById('login-screen').classList.add('visible');
+  document.getElementById('app-root').style.display = 'none';
+  setLoginLoading(false);
+}
+
+function showApp() {
+  document.getElementById('login-screen').classList.remove('visible');
+  document.getElementById('app-root').style.display = 'grid';
+}
+
+let initialized = false;
+
+async function maybeInitApp(user) {
+  if(initialized && currentUser?.id === user.id) return;
+  initialized = true;
+  try {
+    await initApp(user);
+    showApp();
+    // Limpa o hash da URL sem recarregar a página
+    if(window.location.hash.includes('access_token')) {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  } catch(e) {
+    console.error('Erro ao iniciar app:', e);
+    initialized = false;
+    showLogin();
+  }
+}
+
+// ── Listener para todos os eventos auth ──
+sb.auth.onAuthStateChange((event, session) => {
+  if(event === 'TOKEN_REFRESHED') return;
+
+  if((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+    maybeInitApp(session.user);
+    return;
+  }
+
+  if(event === 'SIGNED_OUT') {
+    initialized = false;
+    currentUser = null;
+    S = DEFAULT_STATE();
+    showLogin();
+  }
+});
+
+// ── Fallback: se não vier nenhum evento em 6s, mostra login ──
+// (só ativa se NÃO houver hash de OAuth na URL)
+if(!window.location.hash.includes('access_token')) {
+  setTimeout(() => {
+    if(!initialized) showLogin();
+  }, 6000);
+}
 </script>
 </body>
 </html>
