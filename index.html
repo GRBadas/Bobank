@@ -1122,21 +1122,6 @@ async function initApp(user){
   updatePendenciaBadge();updateFixosBadge();updateLembreteBadge();
 }
 
-// ════ SUPABASE AUTH LISTENER ════
-sb.auth.onAuthStateChange(async (event, session) => {
-  if(session?.user){
-    if(!currentUser || currentUser.id !== session.user.id){
-      await initApp(session.user);
-    }
-  } else {
-    if(currentUser){
-      currentUser = null;
-      document.getElementById('app-root').style.display = 'none';
-    }
-    document.getElementById('login-screen').classList.add('visible');
-    setLoginLoading(false);
-  }
-});
 
 // ════ UTILS ════
 const $=id=>document.getElementById(id);
@@ -1737,6 +1722,7 @@ function renderAll(){
 }
 
 // ════ INIT ════
+// ════ INIT ════
 document.getElementById('login-screen').classList.add('visible');
 toggleCartaoFields();
 
@@ -1772,9 +1758,11 @@ async function maybeInitApp(user) {
   try {
     await initApp(user);
     showApp();
-    // Limpa o hash da URL sem recarregar a página
+    // Limpa o hash DEPOIS do Supabase já ter processado e salvo a sessão no localStorage
     if(window.location.hash.includes('access_token')) {
-      history.replaceState(null, '', window.location.pathname);
+      setTimeout(() => {
+        history.replaceState(null, '', window.location.pathname);
+      }, 500);
     }
   } catch(e) {
     console.error('Erro ao iniciar app:', e);
@@ -1783,9 +1771,9 @@ async function maybeInitApp(user) {
   }
 }
 
-// ── Listener para todos os eventos auth ──
+// ── Listener ÚNICO para todos os eventos auth ──
 sb.auth.onAuthStateChange((event, session) => {
-  if(event === 'TOKEN_REFRESHED') return;
+  if(event === 'TOKEN_REFRESHED') return; // ignora refresh silencioso
 
   if((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
     maybeInitApp(session.user);
@@ -1800,13 +1788,11 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 });
 
-// ── Fallback: se não vier nenhum evento em 6s, mostra login ──
-// (só ativa se NÃO houver hash de OAuth na URL)
-if(!window.location.hash.includes('access_token')) {
-  setTimeout(() => {
-    if(!initialized) showLogin();
-  }, 6000);
-}
+// ── Fallback: mostra login se não vier nenhum evento em 8s ──
+// (garante que usuários sem sessão não fiquem em loading infinito)
+setTimeout(() => {
+  if(!initialized) showLogin();
+}, 8000);
 </script>
 </body>
 </html>
