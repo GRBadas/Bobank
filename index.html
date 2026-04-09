@@ -1155,7 +1155,7 @@ const uid=()=>++S.uid;
 const catById=id=>S.categorias.find(c=>c.id===id);
 const cardById=id=>S.cartoes.find(c=>c.id===id);
 const saldoCaixinha=cx=>S.movimentacoes.filter(m=>m.cxId===cx.id).reduce((s,m)=>m.tipo==='entrada'?s+m.val:s-m.val,0);
-const catGasto=catId=>S.saidas.filter(s=>s.catId===catId).reduce((a,s)=>a+s.val,0)+S.fixos.filter(f=>f.catId===catId).reduce((a,f)=>a+f.val,0);
+const catGasto=catId=>S.saidas.filter(s=>s.catId===catId).reduce((a,s)=>a+s.val,0);
 const mFilter=arr=>arr.filter(x=>x.mes===S.mesAtivo);
 
 // ════ DARK MODE ════
@@ -1694,8 +1694,8 @@ let selectedCardId='all';
 function selectDashCard(id){selectedCardId=id;document.querySelectorAll('.card-sel-btn').forEach(b=>b.classList.toggle('selected',b.dataset.cid==id||(id==='all'&&b.dataset.cid==='all')));renderDashCard();}
 function renderDashCard(){
   const card=selectedCardId==='all'?null:cardById(selectedCardId);
-  const saidas=mFilter(S.saidas),fixosTot=S.fixos.reduce((s,f)=>s+f.val,0);
-  if(!card){$('cd-gasto').textContent=brl(saidas.reduce((s,x)=>s+x.val,0)+fixosTot);$('cd-saldo').textContent='—';$('cd-limite').textContent='—';}
+  const saidas=mFilter(S.saidas);
+    if(!card){$('cd-gasto').textContent=brl(saidas.reduce((s,x)=>s+x.val,0));$('cd-saldo').textContent='—';$('cd-limite').textContent='—';}
   else if(card.tipo==='credito'){const gastoMes=saidas.filter(s=>s.cartaoId===card.id).reduce((a,s)=>a+s.val,0);$('cd-gasto').textContent=brl(gastoMes);const outstanding=calcCreditOutstanding(card);$('cd-saldo').textContent=brl(card.limite-outstanding);$('cd-saldo').className='k-val text-green';const pctL=card.limite>0?(outstanding/card.limite*100).toFixed(1):0;$('cd-limite').textContent=brl(card.limite)+' ('+pctL+'% usado)';}
   else{const gastoMes=saidas.filter(s=>s.cartaoId===card.id).reduce((a,s)=>a+s.val,0);$('cd-gasto').textContent=brl(gastoMes);$('cd-saldo').textContent=brl(calcDebitSaldo(card));$('cd-saldo').className='k-val text-green';$('cd-limite').textContent='—';}
 }
