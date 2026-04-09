@@ -978,6 +978,7 @@ const DEFAULT_STATE = () => ({
 });
 
 let S = DEFAULT_STATE();
+let saidasSort = {col: 'data', dir: 'desc'};
 let currentUser = null;
 let saveTimer = null;
 
@@ -1427,9 +1428,22 @@ function addSaida(){
 }
 function delSaida(id){S.saidas=S.saidas.filter(s=>s.id!==id);save();renderSaidas();renderDashboard();renderCartoes();}
 function renderSaidas(){
-  const itens=mFilter(S.saidas),tb=$('tb-saidas');
-  if(!itens.length){tb.innerHTML='<tr><td class="empty-msg" colspan="8">Nenhuma saída neste mês</td></tr>';}
-  else tb.innerHTML=[...itens].reverse().map(s=>{
+  const itens=mFilter(S.saidas);
+  const sorted=[...itens].sort((a,b)=>{
+    const dir=saidasSort.dir==='asc'?1:-1;
+    if(saidasSort.col==='data') return a.data.localeCompare(b.data)*dir;
+    if(saidasSort.col==='val') return (a.val-b.val)*dir;
+    if(saidasSort.col==='cat'){const ca=catById(a.catId)?.nome||'';const cb=catById(b.catId)?.nome||'';return ca.localeCompare(cb)*dir;}
+    if(saidasSort.col==='cartao'){const ca=cardById(a.cartaoId)?.nome||'';const cb=cardById(b.cartaoId)?.nome||'';return ca.localeCompare(cb)*dir;}
+    return 0;
+  });
+  const arrow=col=>saidasSort.col===col?(saidasSort.dir==='asc'?' ↑':' ↓'):'';
+  const th=(col,label)=>`<th style="cursor:pointer;user-select:none" onclick="setSaiSort('${col}')">${label}${arrow(col)}</th>`;
+  const tb=$('tb-saidas');
+  document.querySelector('#page-saidas thead tr').innerHTML=
+    th('data','Data')+th('desc','Descrição')+th('val','Valor')+th('cat','Categoria')+th('cartao','Cartão')+`<th>Parcelas</th><th>Obs.</th><th></th>`;
+  if(!sorted.length){tb.innerHTML='<tr><td class="empty-msg" colspan="8">Nenhuma saída neste mês</td></tr>';}
+  else tb.innerHTML=sorted.map(s=>{
     const cat=catById(s.catId),card=cardById(s.cartaoId);
     return`<tr><td>${s.data}</td><td>${s.desc}</td><td class="num text-red">${brl(s.val)}</td>
       <td>${cat?`<span style="display:flex;align-items:center;gap:5px"><span class="col-dot" style="background:${cat.cor}"></span>${cat.icon} ${cat.nome}</span>`:'—'}</td>
@@ -1438,6 +1452,11 @@ function renderSaidas(){
       <td><button class="btn btn-danger btn-sm btn-icon" onclick="delSaida(${s.id})">✕</button></td></tr>`;
   }).join('');
   $('tot-saidas').textContent=brl(itens.reduce((s,e)=>s+e.val,0));
+}
+function setSaiSort(col){
+  if(saidasSort.col===col) saidasSort.dir=saidasSort.dir==='asc'?'desc':'asc';
+  else { saidasSort.col=col; saidasSort.dir='asc'; }
+  renderSaidas();
 }
 
 // ════ GASTOS FIXOS ════
