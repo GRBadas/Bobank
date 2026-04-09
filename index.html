@@ -1701,10 +1701,10 @@ function renderDashCard(){
 }
 function renderDashboard(){
   const ents=mFilter(S.entradas),sais=mFilter(S.saidas),movsMes=mFilter(S.movimentacoes);
-  const totEnt=ents.reduce((s,e)=>s+e.val,0),totSai=sais.reduce((s,x)=>s+x.val,0),totFix=S.fixos.reduce((s,f)=>s+f.val,0);
+  const totEnt=ents.reduce((s,e)=>s+e.val,0),totSai=sais.reduce((s,x)=>s+x.val,0),totFix=S.fixosExecucoes.filter(e=>e.mes===S.mesAtivo).reduce((s,e)=>s+e.val,0);
   const totCaix=movsMes.filter(m=>m.tipo==='entrada').reduce((s,m)=>s+m.val,0)-movsMes.filter(m=>m.tipo==='saida').reduce((s,m)=>s+m.val,0);
   $('d-entradas').textContent=brl(totEnt);$('d-saidas').textContent=brl(totSai);$('d-fixos').textContent=brl(totFix);
-  $('d-caix').textContent=brl(S.caixinhas.reduce((s,cx)=>s+saldoCaixinha(cx),0));$('d-saldo').textContent=brl(totEnt-totSai-totFix);
+  $('d-caix').textContent=brl(S.caixinhas.reduce((s,cx)=>s+saldoCaixinha(cx),0));$('d-saldo').textContent=brl(totEnt-totSai);
   const pendD=S.pendencias.filter(p=>!p.pago&&p.tipo==='devo').reduce((s,p)=>s+p.val,0);
   const pendM=S.pendencias.filter(p=>!p.pago&&p.tipo==='me_devem').reduce((s,p)=>s+p.val,0);
   $('d-pend').textContent=brl(pendD);$('d-pend').className='k-val '+(pendD>0?'text-red':'text-green');$('d-pend-sub').textContent=`Cobrar: ${brl(pendM)}`;
