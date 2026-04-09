@@ -1409,7 +1409,10 @@ function renderEntradas(){
       <td>${cat?`<span style="display:flex;align-items:center;gap:5px"><span class="col-dot" style="background:${cat.cor}"></span>${cat.icon} ${cat.nome}</span>`:'—'}</td>
       <td>${card?`<span class="badge" style="background:${card.cor1}22;color:${card.cor1}">${card.nome}</span>`:'<span class="badge bg-gray">N/A</span>'}</td>
       <td>${e.desc}</td><td class="num text-green">${brl(e.val)}</td><td>${e.obs||'—'}</td>
-      <td><button class="btn btn-danger btn-sm btn-icon" onclick="delEntrada(${e.id})">✕</button></td></tr>`;
+        <td style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="editEntrada(${e.id})">✎</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="delEntrada(${e.id})">✕</button>
+        </td></td></tr>`;
   }).join('');
   $('tot-entradas').textContent=brl(itens.reduce((s,e)=>s+e.val,0));
 }
@@ -1449,7 +1452,10 @@ function renderSaidas(){
       <td>${cat?`<span style="display:flex;align-items:center;gap:5px"><span class="col-dot" style="background:${cat.cor}"></span>${cat.icon} ${cat.nome}</span>`:'—'}</td>
       <td>${card?`<span class="badge" style="background:${card.cor1}22;color:${card.cor1}">${card.nome}</span>`:'<span class="badge bg-gray">Dinheiro</span>'}</td>
       <td>${s.parc}</td><td>${s.obs||'—'}</td>
-      <td><button class="btn btn-danger btn-sm btn-icon" onclick="delSaida(${s.id})">✕</button></td></tr>`;
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="editSaida(${s.id})">✎</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="delSaida(${s.id})">✕</button>
+      </td></tr>`;
   }).join('');
   $('tot-saidas').textContent=brl(itens.reduce((s,e)=>s+e.val,0));
 }
@@ -1836,6 +1842,73 @@ sb.auth.onAuthStateChange((event, session) => {
 setTimeout(() => {
   if(!initialized) showLogin();
 }, 8000);
+
+function editEntrada(id){
+  const e=S.entradas.find(x=>x.id===id); if(!e) return;
+  $('ee-id').value=id; $('ee-data').value=e.data; $('ee-desc').value=e.desc;
+  $('ee-val').value=e.val; $('ee-obs').value=e.obs||'';
+  $('ee-tipo').innerHTML=S.tiposEntrada.map(t=>`<option ${t===e.tipo?'selected':''}>${t}</option>`).join('');
+  const catOpts=`<option value="">— Sem categoria —</option>`+S.categorias.map(c=>`<option value="${c.id}" ${c.id===e.catId?'selected':''}>${c.icon} ${c.nome}</option>`).join('');
+  $('ee-cat').innerHTML=catOpts;
+  const cardOpts=`<option value="">— Não especificada —</option>`+S.cartoes.map(c=>`<option value="${c.id}" ${c.id===e.cartaoId?'selected':''}>${c.nome}</option>`).join('');
+  $('ee-cartao').innerHTML=cardOpts;
+  openModal('modal-edit-entrada');
+}
+function saveEntrada(){
+  const id=parseInt($('ee-id').value); const e=S.entradas.find(x=>x.id===id); if(!e) return;
+  e.data=$('ee-data').value; e.tipo=$('ee-tipo').value; e.desc=$('ee-desc').value;
+  e.val=parseFloat($('ee-val').value)||e.val; e.obs=$('ee-obs').value;
+  e.catId=parseInt($('ee-cat').value)||null; e.cartaoId=parseInt($('ee-cartao').value)||null;
+  save(); closeModal('modal-edit-entrada'); renderEntradas(); renderDashboard();
+}
+
+function editSaida(id){
+  const s=S.saidas.find(x=>x.id===id); if(!s) return;
+  $('es-id').value=id; $('es-data').value=s.data; $('es-desc').value=s.desc;
+  $('es-val').value=s.val; $('es-parc').value=s.parc||''; $('es-obs').value=s.obs||'';
+  const catOpts=`<option value="">— Sem categoria —</option>`+S.categorias.map(c=>`<option value="${c.id}" ${c.id===s.catId?'selected':''}>${c.icon} ${c.nome}</option>`).join('');
+  $('es-cat').innerHTML=catOpts;
+  const cardOpts=`<option value="">— Dinheiro / Pix —</option>`+S.cartoes.map(c=>`<option value="${c.id}" ${c.id===s.cartaoId?'selected':''}>${c.nome}</option>`).join('');
+  $('es-cartao').innerHTML=cardOpts;
+  openModal('modal-edit-saida');
+}
+function saveSaida(){
+  const id=parseInt($('es-id').value); const s=S.saidas.find(x=>x.id===id); if(!s) return;
+  s.data=$('es-data').value; s.desc=$('es-desc').value;
+  s.val=parseFloat($('es-val').value)||s.val; s.parc=$('es-parc').value; s.obs=$('es-obs').value;
+  s.catId=parseInt($('es-cat').value)||null; s.cartaoId=parseInt($('es-cartao').value)||null;
+  save(); closeModal('modal-edit-saida'); renderSaidas(); renderDashboard(); renderCartoes();
+}
+
 </script>
+<div class="modal-bg" id="modal-edit-entrada">
+  <div class="modal"><h3>Editar Entrada</h3><input type="hidden" id="ee-id">
+    <div class="form-grid fg-2">
+      <div class="field"><label>Data</label><input type="date" id="ee-data"></div>
+      <div class="field"><label>Tipo</label><select id="ee-tipo"></select></div>
+      <div class="field"><label>Categoria</label><select id="ee-cat"></select></div>
+      <div class="field"><label>Cartão / Conta</label><select id="ee-cartao"></select></div>
+      <div class="field span-all"><label>Descrição</label><input type="text" id="ee-desc"></div>
+      <div class="field"><label>Valor (R$)</label><input type="number" id="ee-val" step="0.01" min="0"></div>
+      <div class="field"><label>Observação</label><input type="text" id="ee-obs"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-edit-entrada')">Cancelar</button><button class="btn btn-primary" onclick="saveEntrada()">Salvar</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-edit-saida">
+  <div class="modal"><h3>Editar Saída</h3><input type="hidden" id="es-id">
+    <div class="form-grid fg-2">
+      <div class="field"><label>Data</label><input type="date" id="es-data"></div>
+      <div class="field"><label>Descrição</label><input type="text" id="es-desc"></div>
+      <div class="field"><label>Valor (R$)</label><input type="number" id="es-val" step="0.01" min="0"></div>
+      <div class="field"><label>Categoria</label><select id="es-cat"></select></div>
+      <div class="field"><label>Cartão / Conta</label><select id="es-cartao"></select></div>
+      <div class="field"><label>Parcelas</label><input type="text" id="es-parc"></div>
+      <div class="field span-all"><label>Observação</label><input type="text" id="es-obs"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-edit-saida')">Cancelar</button><button class="btn btn-primary" onclick="saveSaida()">Salvar</button></div>
+  </div>
+</div>
 </body>
 </html>
