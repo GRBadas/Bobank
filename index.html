@@ -505,6 +505,7 @@ tr.pago-row td:last-child,tr.pago-row td:nth-last-child(2){opacity:1;text-decora
   </div>
   <span class="month-badge" id="month-badge">—</span>
   <button class="btn btn-ghost btn-sm" onclick="goToCurrentMonth()">↩ Hoje</button>
+  <button class="btn btn-ghost btn-sm" onclick="abrirModalExport()">📤 Exportar</button>
   <div id="month-readonly-msg"></div>
 </div>
 
@@ -1878,6 +1879,80 @@ function saveSaida(){
   s.val=parseFloat($('es-val').value)||s.val; s.parc=$('es-parc').value; s.obs=$('es-obs').value;
   s.catId=parseInt($('es-cat').value)||null; s.cartaoId=parseInt($('es-cartao').value)||null;
   save(); closeModal('modal-edit-saida'); renderSaidas(); renderDashboard(); renderCartoes();
+}
+
+// EXPORTAR PARA CSV
+
+function exportarCSV(tipo){
+  const mes = S.mesAtivo;
+  const nomeMes = getMesDisplay(mes);
+  let rows = [], nomeArq = '';
+
+  if(tipo === 'entradas'){
+    nomeArq = `entradas_${mes}.csv`;
+    rows.push(['Data','Tipo','Categoria','Conta','Descrição','Valor','Observação']);
+    mFilter(S.entradas).forEach(e=>{
+      const cat=catById(e.catId),card=cardById(e.cartaoId);
+      rows.push([e.data, e.tipo, cat?`${cat.icon} ${cat.nome}`:'—', card?card.nome:'—', e.desc, e.val.toFixed(2), e.obs||'']);
+    });
+  } else if(tipo === 'saidas'){
+    nomeArq = `saidas_${mes}.csv`;
+    rows.push(['Data','Descrição','Valor','Categoria','Cartão','Parcelas','Observação']);
+    mFilter(S.saidas).forEach(s=>{
+      const cat=catById(s.catId),card=cardById(s.cartaoId);
+      rows.push([s.data, s.desc, s.val.toFixed(2), cat?`${cat.icon} ${cat.nome}`:'—', card?card.nome:'Dinheiro', s.parc||'', s.obs||'']);
+    });
+  } else if(tipo === 'fixos'){
+    nomeArq = `fixos_${mes}.csv`;
+    rows.push(['Descrição','Valor','Dia Vencimento','Categoria','Conta','Status','Data Execução']);
+    S.fixos.forEach(f=>{
+      const cat=catById(f.catId),card=cardById(f.cartaoId);
+      const exec=fixoExecMes(f.id,mes),status=fixoStatus(f);
+      rows.push([f.desc, f.val.toFixed(2), f.vencDia||'—', cat?`${cat.icon} ${cat.nome}`:'—', card?card.nome:'—', status, exec?exec.data:'—']);
+    });
+  } else if(tipo === 'completo'){
+    nomeArq = `bobank_completo_${mes}.csv`;
+    rows.push(['Tipo','Data','Descrição','Valor','Categoria','Conta','Extra','Observação']);
+    mFilter(S.entradas).forEach(e=>{
+      const cat=catById(e.catId),card=cardById(e.cartaoId);
+      rows.push(['Entrada', e.data, e.desc, e.val.toFixed(2), cat?cat.nome:'—', card?card.nome:'—', e.tipo, e.obs||'']);
+    });
+    mFilter(S.saidas).forEach(s=>{
+      const cat=catById(s.catId),card=cardById(s.cartaoId);
+      rows.push(['Saída', s.data, s.desc, s.val.toFixed(2), cat?cat.nome:'—', card?card.nome:'Dinheiro', s.parc||'', s.obs||'']);
+    });
+    S.fixos.forEach(f=>{
+      const cat=catById(f.catId),card=cardById(f.cartaoId),exec=fixoExecMes(f.id,mes);
+      rows.push(['Fixo', exec?exec.data:'—', f.desc, f.val.toFixed(2), cat?cat.nome:'—', card?card.nome:'—', fixoStatus(f), '']);
+    });
+  }
+
+  const bom = '\uFEFF'; // BOM para Excel reconhecer UTF-8
+  const csv = bom + rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=nomeArq; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function abrirModalExport(){
+  const mes = getMesDisplay(S.mesAtivo);
+  const html = `
+    <div class="modal-bg open" id="modal-export" onclick="if(event.target===this)this.remove()">
+      <div class="modal" style="max-width:400px">
+        <h3>📤 Exportar CSV — ${mes}</h3>
+        <p style="font-size:.82rem;color:var(--text2);margin-bottom:20px">Escolha o que exportar. O arquivo abre diretamente no Excel.</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-success" onclick="exportarCSV('entradas');this.closest('.modal-bg').remove()">↓ Entradas do mês</button>
+          <button class="btn btn-danger" onclick="exportarCSV('saidas');this.closest('.modal-bg').remove()">↑ Saídas do mês</button>
+          <button class="btn btn-warning" onclick="exportarCSV('fixos');this.closest('.modal-bg').remove()">⊛ Gastos Fixos</button>
+          <button class="btn btn-primary" onclick="exportarCSV('completo');this.closest('.modal-bg').remove()">★ Relatório Completo</button>
+        </div>
+        <div class="modal-footer"><button class="btn btn-ghost" onclick="this.closest('.modal-bg').remove()">Fechar</button></div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
 }
 
 </script>
